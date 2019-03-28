@@ -116,6 +116,10 @@ function update_modules {
 			BASEDIR=$(basename "${DIR}")
 			echo " *** depmod ${BASEDIR}"
 			depmod -b "${ROOT_PATH}" -a "${BASEDIR}"
+			if [[ -e ${ROOT_PATH}/etc/default/raspberrypi-kernel ]] && grep -i "^INITRD=yes" ${ROOT_PATH}/etc/default/raspberrypi-kernel > /dev/null; then
+                                update-initramfs -c -k "${BASEDIR}"
+                                ${ROOT_PATH}/etc/kernel/postinst.d/rpi-initramfs-config "${BASEDIR}"
+                        fi
 		done
 	else
 		echo " *** As requested, not updating kernel modules"
