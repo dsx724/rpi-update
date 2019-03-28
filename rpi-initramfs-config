@@ -1,0 +1,43 @@
+#!/bin/bash
+set -e
+BOOT_CONFIG_FILE=/boot/config.txt
+if [ ! -f "$BOOT_CONFIG_FILE" ]; then
+	exit 1
+fi
+
+if [ -z "$1" ]; then
+	exit 1
+fi
+
+pi_list=""
+
+if [ "${1##*-}" = "v7+" ]; then
+	pi_list="2 3 3+"
+elif [ "${1##*-}" = "v8+" ]; then
+	true
+else
+	pi_list="0 0w 1"
+fi
+if [ ! -z "$pi_list" ]; then
+	config_temp=`mktemp`
+	config_temp_bounce=`mktemp`
+	cp "$BOOT_CONFIG_FILE" "$config_temp"
+	for pi in $pi_list; do
+		if grep -E "^\[pi${pi//+/\\+}\]\s*\$" "$config_temp"; then
+			awk -f- "$config_temp" > "$config_temp_bounce" <<EOF
+BEGIN { insec = 0; }
+/^\\[/ { if (insec) { insec = 0; print "initramfs initrd.img-$1 followkernel"; } }
+/^\\[pi${pi//+/\\+}\\]/ { insec = 1; }
+/^initramfs initrd\\.img-.* followkernel/ { if (insec) skip = 1; }
+/.*/ { if (skip) skip = 0; else print \$0; }
+END { if (insec) { insec = 0; print "initramfs initrd.img-$1 followkernel"; } }
+EOF
+			cp "$config_temp_bounce" "$config_temp"
+		else
+			echo -e "[pi$pi]\ninitramfs initrd.img-$1 followkernel" >> "$config_temp"
+		fi
+	done
+	cat "$config_temp" > "$BOOT_CONFIG_FILE"
+	rm "$config_temp" "$config_temp_bounce"
+fi
+
