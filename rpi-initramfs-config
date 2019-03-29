@@ -13,17 +13,32 @@ pi_list=""
 
 if [ "${1##*-}" = "v7+" ]; then
 	pi_list="2 3 3+"
+	for initrd in /boot/initrd.img-*; do
+		if [ "${initrd##*-}" = "v7+" ]; then
+			if [ "${initrd##*/}" != "initrd.img-$1" ]; then
+				rm "$initrd"
+			fi
+		fi
+	done
 elif [ "${1##*-}" = "v8+" ]; then
 	true
 else
 	pi_list="0 0w 1"
+	for initrd in /boot/initrd.img-*; do
+		if [ "${initrd##*-}" != "v7+" -a "${initrd##*-}" != "v8+" ]; then
+			if [ "${initrd##*/}" != "initrd.img-$1" ]; then
+				rm "$initrd"
+			fi
+		fi
+	done
 fi
+
 if [ ! -z "$pi_list" ]; then
 	config_temp=`mktemp`
 	config_temp_bounce=`mktemp`
 	cp "$BOOT_CONFIG_FILE" "$config_temp"
 	for pi in $pi_list; do
-		if grep -E "^\[pi${pi//+/\\+}\]\s*\$" "$config_temp"; then
+		if grep -E "^\[pi${pi//+/\\+}\]\s*\$" "$config_temp" > /dev/null; then
 			awk -f- "$config_temp" > "$config_temp_bounce" <<EOF
 BEGIN { insec = 0; }
 /^\\[/ { if (insec) { insec = 0; print "initramfs initrd.img-$1 followkernel"; } }
